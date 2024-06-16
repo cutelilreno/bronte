@@ -12,6 +12,7 @@ Scripts needs the following:
 The following environment variables need to be set to configure the script.
 
 **Required**
+
 `DISCORDWEBHOOK`set to webhook url provided by discord
 
 `THUNDERWEBAPI` set to the url for the dynmap json api.
@@ -19,6 +20,7 @@ The following environment variables need to be set to configure the script.
 `PINGID` set to the discord user id or role id. (role id's must have `&` at the beginning to work)
 
 **Optional**
+
 `THREADID` allows you to target a specific thread in a channel. Set to thread id to use.
 
 `POLLDELAY` The number of seconds to wait between checking for thunderstorms. (default is 60)
