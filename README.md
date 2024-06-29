@@ -9,7 +9,9 @@ Scripts needs the following:
 * curl
 
 ## Configuration
-The following environment variables need to be set to configure the script.
+Configuration can be done either in the bronte.conf file, or via environment variables. (You must remove bronte.conf if setting configuration via environment)
+
+The following need to be set to configure Bronte:
 
 **Required**
 
@@ -24,4 +26,3 @@ The following environment variables need to be set to configure the script.
 `THREADID` allows you to target a specific thread in a channel. Set to thread id to use.
 
 `POLLDELAY` The number of seconds to wait between checking for thunderstorms. (default is 60)
-

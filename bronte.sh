@@ -1,12 +1,16 @@
-#!/bin/bash
-# This is messy but pretend I didn't do this
+#!/usr/bin/env bash
+cd $(dirname $0)
 RNUM='^[0-9]+$'
 # Check configuration
+if [ -f ./bronte.conf ]; then
+  source bronte.conf
+  echo Using conf file
+fi
 if [ -z $DISCORDWEBHOOK ]; then
   echo DISCORDWEBHOOK has not been defined.
   RUN=0
-elif [ -z $THUNDERWEBAPI ]; then
-  echo THUNDERWEBAPI has not been defined. 
+elif [ -z $DYNMAPAPI ]; then
+  echo DYNMAPAPI has not been defined. 
   RUN=0
 elif [ -z $PINGID ]; then
   echo PINGID has not been defined.
@@ -25,8 +29,8 @@ else
 fi
 
 # Initialisations
-DISCNOTIFIED="false"
-# Check if target channel thread or not
+DISCFLAG="false"
+# Check if target is a channel thread or not
 if [ -z $THREADID ]; then
   URLPARAM=""
   WAITWEBHOOK=$DISCORDWEBHOOK'?wait=true'
@@ -35,25 +39,28 @@ else
   WAITWEBHOOK=$DISCORDWEBHOOK'?wait=true&thread_id='$THREADID
   echo Using thread id: $THREADID
 fi
+# Prep Directories if missing
+[ ! -d "./logs" ] && mkdir ./logs
+[ ! -d "./tmp" ] && mkdir ./tmp
 
 # curl was being bitchy so I just did it like this ¯\_(ツ)_/¯
 function sendMsg () {
     MSG='{"username": "Bronte", "content": "'$*'"}'
-    echo $MSG > msg.tmp
+    echo $MSG > ./tmp/msg.tmp
     curl \
         -H "Content-Type: application/json" \
-        --data-binary @msg.tmp \
-        $WAITWEBHOOK 2> /dev/null > response.tmp
+        --data-binary @./tmp/msg.tmp \
+        $WAITWEBHOOK 2> /dev/null > ./tmp/response.tmp
 }
 function appendLastMsg () {
-    MSG='{"content": "'`cat msg.tmp | jq '.content' | sed s/\"//g`' '$*'"}'
-    echo $MSG > append.tmp
-    PATCHWEBHOOK=$DISCORDWEBHOOK'/messages/'`cat response.tmp | jq '.id' | sed s/\"//g`$URLPARAM
+    MSG='{"content": "'`cat ./tmp/msg.tmp | jq '.content' | sed s/\"//g`' '$*'"}'
+    echo $MSG > ./tmp/append.tmp
+    PATCHWEBHOOK=$DISCORDWEBHOOK'/messages/'`cat ./tmp/response.tmp | jq '.id' | sed s/\"//g`$URLPARAM
     curl \
         -H "Content-Type: application/json" \
-        --data-binary @append.tmp \
+        --data-binary @./tmp/append.tmp \
         -X PATCH \
-        $PATCHWEBHOOK 2> /dev/null > debug.tmp
+        $PATCHWEBHOOK 2> /dev/null > ./tmp/debug.tmp
 }
 function updateDiscTimestamp () {
     TIMESTAMP=`date -u +%s`
@@ -67,41 +74,40 @@ function calcDurationTimestamp () {
 # Main program loop, and i'll just manage this via systemd
 while [ $RUN = 1 ]
 do
-  # grab and process json
-  curl $THUNDERWEBAPI 2>/dev/null > json.tmp
-  ISTHUNDER=`cat json.tmp | jq '.isThundering'`
-  HASSTORM=`cat json.tmp | jq '.hasStorm'`
+  # grab and process json from dynmap
+  curl $DYNMAPAPI 2>/dev/null > ./tmp/json.tmp
+  ISTHUNDER=`cat ./tmp/json.tmp | jq '.isThundering'`
+  HASSTORM=`cat ./tmp/json.tmp | jq '.hasStorm'`
   if [[ $ISTHUNDER == "true" && $HASSTORM == "true" ]]; then
     THUNDER="true"
   else
     THUNDER="false"
   fi
 
-  # For the console spam
-  STATE='('`date -R`') - Thundering: '$THUNDER'; Discord: '$DISCNOTIFIED'; isThundering: '$ISTHUNDER'; hasStorm: '$HASSTORM
+  # For the logs/console spam
+  STATE='('`date -R`') - Thundering: '$THUNDER'; Discord: '$DISCFLAG'; isThundering: '$ISTHUNDER'; hasStorm: '$HASSTORM
 
   # core bot
-  if [[ $THUNDER == "false" && $DISCNOTIFIED == "false" ]]; then
+  if [[ $THUNDER == "false" && $DISCFLAG == "false" ]]; then
+    echo $STATE > /dev/null # decided to mute this
+  elif [[ $THUNDER == "true" && $DISCFLAG == "true" ]]; then
+    echo $STATE > /dev/null # decided to mute this
+  elif [[ $THUNDER == "true" && $DISCFLAG == "false" ]]; then
     echo $STATE
-  elif [[ $THUNDER == "true" && $DISCNOTIFIED == "true" ]]; then
-    echo $STATE
-  elif [[ $THUNDER == "true" && $DISCNOTIFIED == "false" ]]; then
-    echo $STATE
-    echo Started thundering - $STATE >> `date -I`-log
+    echo Started thundering - $STATE >> ./logs/`date -I`-log
     updateDiscTimestamp
     sendMsg 'Hey <@'$PINGID'>, a new thunderstorm started '$DISCTIMESTAMP'. '
-    DISCNOTIFIED="true"
-  elif [[ $THUNDER == "false" && $DISCNOTIFIED == "true" ]]; then
+    DISCFLAG="true"
+  elif [[ $THUNDER == "false" && $DISCFLAG == "true" ]]; then
     echo $STATE
-    echo Thunderstorm ended - $STATE >> `date -I`-log
+    echo Thunderstorm ended - $STATE >> ./logs/`date -I`-log
     calcDurationTimestamp
-    appendLastMsg 'The **thunderstorm is no more**. Bronte giveth, and she taketh away! *Duration approx '$ELAPSEDTIME'*'
-    DISCNOTIFIED="false"
+    appendLastMsg 'The __**thunderstorm is no more**__. Bronte giveth, and she taketh away! *Duration approx '$ELAPSEDTIME'*'
+    DISCFLAG="false"
   else
     echo Script error, reinitialise and log
-    echo Script Error - $STATE >> `date -I`-log
-    DISCNOTIFIED="false"
-    THUNDER=""
+    echo Script Error - $STATE >> ./logs/`date -I`-log
+    DISCFLAG="false"
   fi
 
   sleep $POLLDELAY

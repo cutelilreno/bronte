@@ -1,0 +1,14 @@
+[Unit]
+Description=Bronte Thunderstorm Bot
+After=network.target
+StartLimitIntervalSec=0[Service]
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=60
+User=bronte
+ExecStart=/usr/bin/env bash /opt/bronte/bronte.sh
+
+[Install]
+WantedBy=multi-user.target
