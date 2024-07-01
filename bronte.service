@@ -1,7 +1,7 @@
 [Unit]
 Description=Bronte Thunderstorm Bot
 After=network.target
-StartLimitIntervalSec=0[Service]
+StartLimitIntervalSec=0
 
 [Service]
 Type=simple
